@@ -3,26 +3,13 @@ import ReactMarkdown from 'react-markdown'
 import SyntaxHighlighter from 'react-syntax-highlighter'
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 import remarkGfm from 'remark-gfm'
+import axios from 'axios'
 
-const MOCK_DATA = {
-  problem: "Write a function that debounces a given function by a specified delay.",
-  solution_1: "### Solution 1: Closure-based Debounce\nThis approach uses a standard closure to maintain the timeout ID.\n\n```javascript\nfunction debounce(func, wait) {\n  let timeoutId;\n  return function(...args) {\n    clearTimeout(timeoutId);\n    timeoutId = setTimeout(() => {\n      func.apply(this, args);\n    }, wait);\n  };\n}\n```\n\nIt handles arguments and `this` binding correctly, and cancels the previous timeout if called again within the window.",
-  solution_2: "### Solution 2: Minimal Arrow Function Debounce\nThis is a shorter version utilizing arrow functions. \n\n```javascript\nconst debounce = (fn, ms) => {\n  let t;\n  return (...a) => {\n    clearTimeout(t);\n    t = setTimeout(() => fn(...a), ms);\n  };\n};\n```\n\nWhile concise and functional, arrow functions inherently bind context lexically. If `this` binding is important for an event listener, this naive arrow function might cause issues if not carefully wrapped.",
-  judge: {
-    solution_1_score: 10,
-    solution_2_score: 6,
-    solution_1_reasoning: "Robust implementation. Accurately handles context and arbitrary arguments, making it safe for broad usage in React or vanilla JS.",
-    solution_2_reasoning: "Too simplistic. Fails to account for `this` context binding which is often crucial when dealing with native DOM events."
-  }
-};
 
-const createSystemMsg = (text) => ({
+const createSystemMsg = (data) => ({
   id: Date.now().toString(),
   role: 'system',
-  data: {
-    ...MOCK_DATA,
-    problem: `Task: ${text}\n\nProvide two solutions and evaluation.`
-  }
+  data
 });
 
 function App() {
@@ -35,21 +22,38 @@ function App() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  async function fetchResponse(query) {
+    const response = await axios.post("http://localhost:3000/response", {input: query});
+    return response.data.result;  ;
+  }
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+
+    if (!input.trim()) return;  
     const userMsg = { id: Date.now().toString(), role: 'user', content: input };
+
+
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
+    try {
+      const result = await fetchResponse(input); // ✅ await here
 
-    setTimeout(() => {
-      setMessages(prev => [...prev, createSystemMsg(userMsg.content)]);
-      setIsTyping(false);
-    }, 1200);
+      const systemMsg = createSystemMsg(result);
+
+      setMessages(prev => [...prev, systemMsg]);
+    } catch (err) {
+      console.error(err);
+    }
+
+
+    setIsTyping(false);
+
+
   };
 
   return (
@@ -84,18 +88,18 @@ function App() {
               )}
             </div>
           ))}
-          
+
           {isTyping && (
-             <div className="flex justify-start">
-               <div className="bg-white/5 border border-white/10 px-6 py-4 rounded-3xl flex gap-3 items-center text-sm text-gray-400">
-                  <span className="font-medium tracking-wide">Evaluating solutions</span>
-                  <span className="flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></span>
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
-                  </span>
-               </div>
-             </div>
+            <div className="flex justify-start">
+              <div className="bg-white/5 border border-white/10 px-6 py-4 rounded-3xl flex gap-3 items-center text-sm text-gray-400">
+                <span className="font-medium tracking-wide">Evaluating solutions</span>
+                <span className="flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </span>
+              </div>
+            </div>
           )}
           <div ref={endRef} className="h-4" />
         </div>
@@ -111,7 +115,7 @@ function App() {
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
           />
-          <button 
+          <button
             onClick={handleSend}
             disabled={!input.trim()}
             className="absolute right-3 top-3 p-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white rounded-full transition-colors flex items-center justify-center shadow-lg"
@@ -125,6 +129,7 @@ function App() {
 }
 
 function MessageCard({ data }) {
+  if (!data?.judge_recommendation) return null;
   return (
     <div className="w-full bg-[#131a2b] border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl shadow-indigo-900/10">
       <div className="p-8 md:p-10 border-b border-white/5 bg-gradient-to-r from-white/[0.02] to-transparent">
@@ -134,19 +139,19 @@ function MessageCard({ data }) {
         </h3>
         <div className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap font-light">{data.problem}</div>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-white/5">
-        <SolutionPanel 
-          title="Solution One" 
-          content={data.solution_1} 
-          score={data.judge.solution_1_score} 
-          reasoning={data.judge.solution_1_reasoning} 
+        <SolutionPanel
+          title="Solution One"
+          content={data.solution_1}
+          score={data.judge_recommendation.solution_1_score}
+          reasoning={data.judge_recommendation.solution_1_reasoning}
         />
-        <SolutionPanel 
-          title="Solution Two" 
-          content={data.solution_2} 
-          score={data.judge.solution_2_score} 
-          reasoning={data.judge.solution_2_reasoning} 
+        <SolutionPanel
+          title="Solution Two"
+          content={data.solution_2}
+          score={data.judge_recommendation.solution_2_score}
+          reasoning={data.judge_recommendation.solution_2_reasoning}
         />
       </div>
     </div>
@@ -155,9 +160,9 @@ function MessageCard({ data }) {
 
 function SolutionPanel({ title, content, score, reasoning }) {
   const getScoreColor = (sc) => {
-    if(sc >= 9) return 'text-emerald-400 bg-emerald-400/10 border-emerald-500/20';
-    if(sc >= 7) return 'text-indigo-400 bg-indigo-400/10 border-indigo-500/20';
-    if(sc >= 5) return 'text-yellow-400 bg-yellow-400/10 border-yellow-500/20';
+    if (sc >= 9) return 'text-emerald-400 bg-emerald-400/10 border-emerald-500/20';
+    if (sc >= 7) return 'text-indigo-400 bg-indigo-400/10 border-indigo-500/20';
+    if (sc >= 5) return 'text-yellow-400 bg-yellow-400/10 border-yellow-500/20';
     return 'text-red-400 bg-red-400/10 border-red-500/20';
   };
 
@@ -172,7 +177,7 @@ function SolutionPanel({ title, content, score, reasoning }) {
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              code({node, inline, className, children, ...props}) {
+              code({ node, inline, className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || '')
                 return !inline && match ? (
                   <SyntaxHighlighter
@@ -195,7 +200,7 @@ function SolutionPanel({ title, content, score, reasoning }) {
           </ReactMarkdown>
         </div>
       </div>
-      
+
       <div className="p-8 md:p-10 bg-[#0d121c]/50 mt-auto border-t border-white/5">
         <h5 className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500 mb-6 flex items-center gap-2">
           Judge Evaluation
@@ -203,10 +208,10 @@ function SolutionPanel({ title, content, score, reasoning }) {
         </h5>
         <div className="flex flex-col sm:flex-row gap-6 items-start">
           <div className={`shrink-0 flex items-center justify-center w-20 h-20 rounded-2xl border ${getScoreColor(score)} shadow-inner`}>
-             <div className="text-center">
-               <div className="text-3xl font-light leading-none">{score}</div>
-               <div className="text-[10px] font-bold uppercase tracking-wider opacity-60 mt-1">/ 10</div>
-             </div>
+            <div className="text-center">
+              <div className="text-3xl font-light leading-none">{score}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider opacity-60 mt-1">/ 10</div>
+            </div>
           </div>
           <div className="flex-1">
             <p className="text-sm text-gray-400 leading-relaxed italic">{reasoning}</p>

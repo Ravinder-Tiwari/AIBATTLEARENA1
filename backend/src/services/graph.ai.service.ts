@@ -42,7 +42,12 @@ const state = new StateSchema({
         solution_2_score: z.number().default(0),
         solution_1_reasoning: z.string().default(""),
         solution_2_reasoning: z.string().default(""),
-    })
+    }).default({
+    solution_1_score: 0,
+    solution_2_score: 0,
+    solution_1_reasoning: "",
+    solution_2_reasoning: "",
+  })
 })
 
 
