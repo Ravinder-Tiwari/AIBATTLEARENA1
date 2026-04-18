@@ -18,8 +18,8 @@ app.get("/health", (req, res) => {
 })  
 
 app.post("/response", async (req, res) => {
-    const { input } = req.body
-    const result = await useGraph(input)
+    const { problem } = req.body
+    const result = await useGraph(problem)
     res.status(200).json({
         message: "Response from graph",
         result
