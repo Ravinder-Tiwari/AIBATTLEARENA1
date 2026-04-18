@@ -81,7 +81,7 @@ Evaluate both and return scores + reasoning.
 };
 
 // ✅ Properly typed graph (FIXES TS2883)
-const graph: CompiledStateGraph<typeof state> = new StateGraph(state)
+const graph = new StateGraph(state)
   .addNode("solution", solutionNode)
   .addNode("judge", judgeNode)
   .addEdge(START, "solution")
