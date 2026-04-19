@@ -5,6 +5,7 @@ import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 import remarkGfm from 'remark-gfm'
 import axios from 'axios'
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 const createSystemMsg = (data) => ({
   id: Date.now().toString(),
@@ -23,9 +24,16 @@ function App() {
   };
 
   async function fetchResponse(query) {
-    const response = await axios.post(
-      "https://aibattlearena1.onrender.com/response", {problem: query});
-    return response.data ;
+    const payload = { problem: query.trim() };
+    console.info('POST /response payload:', payload);
+
+    const response = await axios.post(`${API_BASE_URL}/response`, payload, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.data?.result ?? response.data;
   }
 
   useEffect(() => {
@@ -34,25 +42,37 @@ function App() {
 
   const handleSend = async () => {
 
-    if (!input.trim()) return;  
-    const userMsg = { id: Date.now().toString(), role: 'user', content: input };
+    if (isTyping || !input.trim()) return;
+
+    const query = input.trim();
+    const userMsg = { id: Date.now().toString(), role: 'user', content: query };
 
 
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
     try {
-      const result = await fetchResponse(input); // ✅ await here
+      const result = await fetchResponse(query);
 
       const systemMsg = createSystemMsg(result);
 
       setMessages(prev => [...prev, systemMsg]);
     } catch (err) {
-      console.error(err);
+      const message = err.response?.data?.message || err.message || 'Request failed';
+
+      console.error('Failed to POST /response', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message
+      });
+
+      setMessages(prev => [...prev, createSystemMsg({
+        error: true,
+        message
+      })]);
+    } finally {
+      setIsTyping(false);
     }
-
-
-    setIsTyping(false);
 
 
   };
@@ -130,7 +150,19 @@ function App() {
 }
 
 function MessageCard({ data }) {
-  if (!data?.judge_recommendation) return null;
+  if (data?.error) {
+    return (
+      <div className="w-full bg-red-500/10 border border-red-500/20 rounded-2xl px-6 py-5 text-red-100">
+        <p className="text-sm font-semibold uppercase tracking-wide text-red-300">Request failed</p>
+        <p className="mt-2 text-sm text-red-100/90">{data.message}</p>
+      </div>
+    )
+  }
+
+  const graphData = data?.result ?? data;
+
+  if (!graphData?.judge_recommendation) return null;
+
   return (
     <div className="w-full bg-[#131a2b] border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl shadow-indigo-900/10">
       <div className="p-8 md:p-10 border-b border-white/5 bg-gradient-to-r from-white/[0.02] to-transparent">
@@ -138,21 +170,21 @@ function MessageCard({ data }) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
           Problem Addressed
         </h3>
-        <div className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap font-light">{data.problem}</div>
+        <div className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap font-light">{graphData.problem}</div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-white/5">
         <SolutionPanel
           title="Solution One"
-          content={data.solution_1}
-          score={data.judge_recommendation.solution_1_score}
-          reasoning={data.judge_recommendation.solution_1_reasoning}
+          content={graphData.solution_1}
+          score={graphData.judge_recommendation.solution_1_score}
+          reasoning={graphData.judge_recommendation.solution_1_reasoning}
         />
         <SolutionPanel
           title="Solution Two"
-          content={data.solution_2}
-          score={data.judge_recommendation.solution_2_score}
-          reasoning={data.judge_recommendation.solution_2_reasoning}
+          content={graphData.solution_2}
+          score={graphData.judge_recommendation.solution_2_score}
+          reasoning={graphData.judge_recommendation.solution_2_reasoning}
         />
       </div>
     </div>
