@@ -1,7 +1,7 @@
- import chatModel from "../models/chat.model";
-import messageModel from "../models/message.model";
-import useGraph from "../services/graph.ai.service"
-import { getTitle } from "../services/title.service";
+ import chatModel from "../models/chat.model.js";
+import messageModel from "../models/message.model.js";
+import useGraph from "../services/graph.ai.service.js"
+import { getTitle } from "../services/title.service.js";
 
 
 // Create a new chat
