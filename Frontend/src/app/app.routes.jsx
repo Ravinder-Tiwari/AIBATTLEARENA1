@@ -1,0 +1,20 @@
+import React from "react";
+import { createBrowserRouter, Navigate } from "react-router-dom";
+import Login from "../features/auth/pages/Login";
+import Register from "../features/auth/pages/Register";
+import Dashboard from "../features/chat/pages/Dashboard";
+
+export const router = createBrowserRouter([
+    {
+        path: "/",
+        element: <Dashboard />
+    },
+    {
+        path: "/login",
+        element: <Login />
+    },
+    {
+        path: "/register",
+        element: <Register />
+    }
+]);

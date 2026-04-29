@@ -12,6 +12,11 @@ export default defineConfig({
     proxy: {
       '/response': 'http://localhost:3000',
       '/health': 'http://localhost:3000',
+      '/api': {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        secure: false,
+      }
     },
   },
 })

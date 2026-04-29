@@ -1,85 +1,90 @@
-    import express from "express"
-    import useGraph from "./services/graph.ai.service.js"
-    import cors from "cors"
+import express,{urlencoded} from "express"
+import useGraph from "./services/graph.ai.service.js"
+import cors from "cors"
+import appConfig from "./config/config"
+import passport from "passport"
+import rateLimit from "express-rate-limit";
+// @ts-ignore
+import cookieparser from "cookie-parser"
+import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20"
+// import session from "express-session";
+// @ts-ignore
+import authRouter from "./routes/auth.routes.js"
+// @ts-ignore
+import chatRouter from "./routes/chat.routes.js"
 
-    type ApiError = Error & {
+import morgan from "morgan"
+
+
+
+type ApiError = Error & {
+    status?: number
+    statusCode?: number
+    response?: {
         status?: number
-        statusCode?: number
-        response?: {
-            status?: number
-            data?: unknown
-        }
+        data?: unknown
     }
+}
 
-    const app = express()
+const app = express()
 
-    const allowedOrigins = new Set([
-        "https://aibattlearena1.onrender.com",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        process.env.FRONTEND_URL
-    ].filter(Boolean) as string[])
 
-    app.use(cors({
-        origin: (origin, callback) => {
-            if (!origin || allowedOrigins.has(origin)) {
-                callback(null, true)
-                return
-            }
 
-            callback(null, false)
-        },
-        methods: ["GET", "POST"],
-        credentials: true
-    }))
-    app.use(express.json())
-    app.use(express.static("./public"))
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests
+  message: {
+    message: "Too many requests, please try again later"
+  }
+});
+const allowedOrigins = new Set([
+    "https://aibattlearena1.onrender.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    process.env.FRONTEND_URL
+].filter(Boolean) as string[])
 
-    app.get("/health", (req, res) => { 
-        res.status(200).json({ status: "ok" })
-    })  
-
-    app.post("/response", async (req, res) => {
-        try {
-            const { problem } = req.body ?? {}
-
-            if (typeof problem !== "string" || !problem.trim()) {
-                return res.status(400).json({
-                    error: "Bad Request",
-                    message: "Request body must include a non-empty `problem` string."
-                })
-            }
-
-            console.log("[/response] problem:", problem)
-            const result = await useGraph(problem.trim())
-
-            return res.status(200).json({
-                message: "Response from graph",
-                result
-            })
-        } catch (error) {
-            const err = error as ApiError
-            const status = err.status ?? err.statusCode ?? err.response?.status
-            const responseStatus = typeof status === "number" && status >= 400 && status < 600
-                ? status
-                : 500
-
-            console.error("[/response] failed:", {
-                message: err.message,
-                status: responseStatus,
-                providerStatus: err.response?.status,
-                providerData: err.response?.data
-            })
-
-            return res.status(responseStatus).json({
-                error: responseStatus === 500 ? "Internal Server Error" : "Request Failed",
-                message: err.message || "Failed to generate response."
-            })
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.has(origin)) {
+            callback(null, true)
+            return
         }
-    })
+
+        callback(null, false)
+    },
+    methods: ["GET", "POST"],
+    credentials: true
+}))
+app.use(express.json())
+app.use(cookieparser())
+app.use(morgan("dev"))
+app.use(urlencoded({extended:true}))
+app.use(express.static("./public"))
+// app.use(session({
+//   secret: "supersecret",   // use env in production
+//   resave: false,
+//   saveUninitialized: false,
+// }));
+app.use(passport.initialize())
+// app.use(passport.session())
+
+passport.use(new GoogleStrategy({
+    clientID: appConfig.GOOGLE_CLIENT_ID,
+    clientSecret: appConfig.GOOGLE_CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/api/auth/google/callback"
+}, (accessToken: string, refreshToken: string, profile: Profile, done: (error: any, user?: any) => void) => {
+    // Here you would typically find or create a user in your database
+    // For this example, we'll just return the profile
+    return done(null, profile)
+}))
 
 
 
 
 
-    export default app  
+
+app.use("/api/auth", authRouter)
+app.use("/api/chat", chatRouter)
+
+export default app  
