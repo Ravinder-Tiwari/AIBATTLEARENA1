@@ -2,7 +2,7 @@ import axios from "axios"
 
 
 const chatApiInstance = axios.create({
-    baseURL:"/api/chat",
+    baseURL: import.meta.env.production.VITE_API_URL + "/api/chat",
     withCredentials:true
 })
 

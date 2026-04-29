@@ -1,7 +1,7 @@
 import axios from "axios"
 
 const authApiInstance = axios.create({
-    baseURL: "http://localhost:3000/api/auth",
+    baseURL: import.meta.env.production.VITE_API_URL +"/api/auth",
     withCredentials: true
 })
 
