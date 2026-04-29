@@ -6,7 +6,7 @@ import { authUser } from "../middleware/auth.middleware.js";
 
 
 
-export const authRouter = Router()
+const authRouter = Router()
 
 authRouter.post("/register", registerUser)
 authRouter.post("/login",authUser, loginUser)
